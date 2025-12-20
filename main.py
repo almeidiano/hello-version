@@ -1,39 +1,41 @@
 from fastapi import APIRouter, FastAPI
-from pydantic import BaseModel
-from enum import Enum
-from datetime import datetime
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JOSEError
-from fastapi import Depends, HTTPException, status
-from services.token import sign_jwt
-
-class TipoCombustivel(str, Enum):
-    'GASOLINA' == 'GASOLINA'
-    'ETANOL' == 'ETANOL'
-    'DIESEL' == 'DIESEL'
-
-class Item(BaseModel):
-    id_posto: int
-    data_hora: datetime
-    tipo_combustivel: TipoCombustivel
-    preco_por_litro: float
-    volume_abastecido: float
-    cpf_motorista: str
+from fastapi import Depends
+from services.token import sign_jwt_token
+from models.Item import Item
+from utils.TipoCombustivel import PrecoCombustivel
 
 app = FastAPI()
 
 router = APIRouter(prefix="/api/v1")
+security = HTTPBearer()
 
 @router.get("/token")
 async def login():
-    return sign_jwt()
-
-security = HTTPBearer()
+    return sign_jwt_token()
 
 @router.post("/abastecimentos")
+async def root(payload: Item, credentials: HTTPAuthorizationCredentials = Depends(security)):    
+    combustivel = payload.tipo_combustivel.name
+    
+    # Regra de Negócio (Flag de Anomalia) checa se o preco_por_litro é +25% do preço original (enum PrecoCombustivel) 
+    preco = payload.preco_por_litro
+    
+    if preco > (PrecoCombustivel[combustivel] * 1.25): 
+        payload.improper_data = True
+        
+        return {"message": payload}
+    else:
+        return {"message": payload}
+
+@router.get("/abastecimentos")
 async def root(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     
-    return {"message": "Conseguiu acessar.", "teu token": token}
+    return {"message": "Conseguiu acessar.", "token": token}
+
+@router.get("/motoristas/{cpf_motorista}/historico")
+async def root(cpf_motorista: str, credentials: HTTPAuthorizationCredentials = Depends(security)):    
+    return {"message": cpf_motorista}
 
 app.include_router(router)
