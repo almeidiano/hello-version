@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build, login and push the Docker image to my repository
+      env: 
+        DOCKER_PASSWORD: ${{ secrets.PAT }}
+      run: | 
+        TAG=${{ github.event.release.tag_name }} 
+        VERSION=${TAG#v} 
+        docker build . --file Dockerfile --tag almeidiano/hello-version:${VERSION} 
+        echo "$DOCKER_PASSWORD" | docker login -u almeidiano --password-stdin 
+        docker push almeidiano/hello-version:${VERSION}
